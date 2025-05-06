@@ -3,6 +3,7 @@ import shutil
 import os
 from datetime import datetime
 import zipfile
+import glob
 
 @task
 def empacotar(c):
@@ -56,3 +57,46 @@ def backup (c, source='.', destination='backup', dias_max=7):
                 zipf.write(file_path, arcname=os.path.relpath(file_path, temp_backup_dir))
         
     print(f'\n Backup criado em: {zip_filename}')
+
+@task
+def descompactar(c, zip_file=None, destino='backup'):
+    """
+    Descompacta o arquivo zip no diretório de destino (dentro da pasta 'backup').
+    Caso o zip_file não seja especificado, utiliza o último arquivo de backup encontrado.
+    """
+    # Defina a pasta de backups
+    backup_folder = 'backup'  # A pasta onde os backups .zip são armazenados
+    
+    # Se zip_file não for fornecido, buscamos o último arquivo de backup criado dentro da pasta 'backup'
+    if not zip_file:
+        # Buscar os arquivos de backup na pasta 'backup' com o padrão de nome
+        backups = glob.glob(os.path.join(backup_folder, "backup_flask_*.zip"))
+        if backups:
+            # Seleciona o mais recente usando a data de modificação
+            zip_file = max(backups, key=os.path.getmtime)
+            print(f"Usando o arquivo de backup mais recente: {zip_file}")
+        else:
+            print("Erro: Nenhum arquivo de backup encontrado na pasta 'backup'.")
+            return
+    
+    if not os.path.exists(zip_file):
+        print(f"Erro: O arquivo {zip_file} não existe.")
+        return
+
+    # Cria uma nova pasta para descompactação dentro da pasta 'backup', baseada no nome do arquivo de backup
+    nome_backup = os.path.splitext(os.path.basename(zip_file))[0]
+    destino_completo = os.path.join(backup_folder, nome_backup)  # Pasta dentro de 'backup'
+    
+    if not os.path.exists(destino_completo):
+        os.makedirs(destino_completo)
+
+    try:
+        # Descompacta o arquivo zip na nova pasta dentro de 'backup'
+        with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+            zip_ref.extractall(destino_completo)
+        print(f'Backup descompactado com sucesso em: {destino_completo}')
+    except zipfile.BadZipFile:
+        print(f'Erro: O arquivo {zip_file} não é um arquivo zip válido.')
+    except Exception as e:
+        print(f'Erro ao descompactar o arquivo {zip_file}: {e}')
+
